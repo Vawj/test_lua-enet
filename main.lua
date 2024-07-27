@@ -10,6 +10,20 @@ local timeoutDuration = 5 -- Consider disconnected after 5 seconds of no activit
 local mouseX, mouseY = 0, 0
 local remoteX, remoteY = 0, 0
 
+local shaderCode = [[
+    extern number time;
+    vec4 effect(vec4 color, Image texture, vec2 texture_coords, vec2 screen_coords) {
+        vec4 pixel = Texel(texture, texture_coords);
+        float r = 0.5 + 0.5 * cos(screen_coords.x * 0.1 + time);
+        float g = 0.5 + 0.5 * cos(screen_coords.y * 0.1 + time + 2.0);
+        float b = 0.5 + 0.5 * cos((screen_coords.x + screen_coords.y) * 0.1 + time + 4.0);
+        return vec4(r, g, b, 1.0) * pixel;
+    }
+]]
+local shader
+local clickSound
+local bgMusic
+
 function love.load(arg)
     if arg[1] == "server" then
         host = enet.host_create("localhost:6789")
@@ -20,6 +34,15 @@ function love.load(arg)
         peer = host:connect("localhost:6789")
         print("Client started, attempting to connect...")
     end
+
+    -- Load shader
+    shader = love.graphics.newShader(shaderCode)
+
+    -- Load sounds
+    clickSound = love.audio.newSource("happy.flac", "static")
+    bgMusic = love.audio.newSource("sound.mp3", "stream")
+    bgMusic:setLooping(true)
+    bgMusic:play()
 end
 
 function love.update(dt)
@@ -63,9 +86,16 @@ function love.update(dt)
             peer = nil
         end
     end
+
+    -- Update shader time
+    shader:send("time", love.timer.getTime())
 end
 
 function love.draw()
+    love.graphics.setShader(shader)
+    love.graphics.rectangle("fill", 0, 0, love.graphics.getWidth(), love.graphics.getHeight())
+    love.graphics.setShader()
+
     love.graphics.print(isServer and "Server" or "Client", 10, 10)
     love.graphics.print(connected and "Connected" or "Not connected", 10, 30)
 
@@ -81,6 +111,12 @@ function love.draw()
 
     -- Reset color
     love.graphics.setColor(1, 1, 1)
+end
+
+function love.mousepressed(x, y, button, istouch, presses)
+    if button == 1 then -- Left mouse button
+        clickSound:play()
+    end
 end
 
 function love.keypressed(key)
